@@ -19,10 +19,13 @@
 import os
 import re
 from datetime import datetime
+import time
 from unittest.mock import Mock
+from elasticsearch import Elasticsearch
 
 from elasticsearch.helpers import bulk
-from elasticsearch.helpers.test import SkipTest, get_test_client
+from unittest import SkipTest
+import elasticsearch_dsl
 from pytest import fixture, skip
 
 from elasticsearch_dsl.connections import add_connection, connections
@@ -36,6 +39,31 @@ from .test_integration.test_data import (
 )
 from .test_integration.test_document import Comment, History, PullRequest, User
 
+
+def get_test_client(nowait=False, **kwargs):
+    # construct kwargs from the environment
+    kw = {"timeout": 30, "ca_certs": ".ci/certs/ca.pem"}
+
+    if "PYTHON_CONNECTION_CLASS" in os.environ:
+        from elasticsearch import connection
+
+        kw["connection_class"] = getattr(
+            connection, os.environ["PYTHON_CONNECTION_CLASS"]
+        )
+
+    kw.update(kwargs)
+    client = Elasticsearch(elasticsearch_dsl, **kw)
+
+    # wait for yellow status
+    for _ in range(1 if nowait else 100):
+        try:
+            client.cluster.health(wait_for_status="yellow")
+            return client
+        except ConnectionError:
+            time.sleep(0.1)
+    else:
+        # timeout
+        raise SkipTest("Elasticsearch failed to start.")
 
 @fixture(scope="session")
 def client():

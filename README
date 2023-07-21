@@ -22,7 +22,7 @@ Installation
 
 ::
 
-  pip install elasticsearch-dsl
+  pip install elasticsearch-dsl-aq
 
 Examples
 --------
